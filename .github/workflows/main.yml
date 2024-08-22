@@ -2,7 +2,7 @@ name: Usage Report
 
 on:
   schedule:
-    - cron: "3 9 * * *"  # Runs at 9:03 AM every day (UK Time)
+    - cron: "59 7 * * *" 
 
   workflow_dispatch:  # Allows manual triggering
 
