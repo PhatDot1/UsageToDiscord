@@ -3,7 +3,6 @@ name: Usage Report
 on:
   schedule:
     - cron: "3 9 * * *"  # Runs at 9:03 AM every day (UK Time)
-
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
