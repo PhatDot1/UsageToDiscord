@@ -4,10 +4,13 @@ import os
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.keys import Keys  # Import Keys here
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 import time
+import os
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -88,13 +91,12 @@ def calculate_monthly_period_percentage():
     return period_pct
 
 def get_zapier_usage():
+    # Use webdriver-manager to automatically manage ChromeDriver
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--remote-debugging-port=9222")  # Sometimes needed in CI
-    # Do not add headless mode since we want to run with a display
-
-    driver = webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
 
     try:
         driver.get("https://zapier.com/app/login")
