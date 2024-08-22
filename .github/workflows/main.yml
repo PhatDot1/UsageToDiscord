@@ -3,6 +3,7 @@ name: Usage Report
 on:
   schedule:
     - cron: "3 9 * * *"  # Runs at 9:03 AM every day (UK Time)
+
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
@@ -13,27 +14,21 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install dependencies and Chrome/Chromedriver
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y unzip xvfb libxi6 libgconf-2-4
-        sudo apt-get install -y wget curl
-
-        # Install Chrome
-        wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-        sudo apt install -y ./google-chrome-stable_current_amd64.deb
-
-        # Install Chromedriver automatically using webdriver-manager
         python -m pip install --upgrade pip
-        pip install requests python-dotenv selenium webdriver-manager
+        pip install requests python-dotenv
 
-    - name: Run Usage Report Script with xvfb
+    - name: Run Usage Report Script
       env:
         PHANTOMBUSTER_API_KEY: ${{ secrets.PHANTOMBUSTER_API_KEY }}
         MAKE_API_KEY: ${{ secrets.MAKE_API_KEY }}
         MAKE_ORG_ID: ${{ secrets.MAKE_ORG_ID }}
         DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        ZAPIER_EMAIL: ${{ secrets.ZAPIER_EMAIL }}
-        ZAPIER_PASSWORD: ${{ secrets.ZAPIER_PASSWORD }}
       run: |
-        xvfb-run -a python usage.py
+        python usage.py
