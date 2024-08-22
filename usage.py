@@ -88,7 +88,7 @@ def calculate_monthly_period_percentage():
     return period_pct
 
 def get_zapier_usage():
-    # Set up the Selenium WebDriver (remove the headless option for testing)
+    # Set up the Selenium WebDriver
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")  # Enable headless mode for GitHub Actions
     driver = webdriver.Chrome(options=options)
@@ -97,8 +97,8 @@ def get_zapier_usage():
         # Navigate to Zapier login page
         driver.get("https://zapier.com/app/login")
 
-        # Click the "Sign in with Google" button using refined selector
-        google_signin_button = WebDriverWait(driver, 10).until(
+        # Click the "Sign in with Google" button
+        google_signin_button = WebDriverWait(driver, 15).until(
             EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Continue with Google')]"))
         )
         google_signin_button.click()
@@ -107,22 +107,21 @@ def get_zapier_usage():
         time.sleep(10)
 
         # Send the email directly to the input field where the caret is already placed
-        email_input = WebDriverWait(driver, 10).until(
+        email_input = WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email']"))
         )
         email_input.send_keys(zapier_email)
-        email_input.send_keys(Keys.RETURN)  # Keys.RETURN to press Enter
+        email_input.send_keys(Keys.RETURN)
 
-        # Wait for the password input to load and enter the password
-        time.sleep(5)
-        password_input = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
+        # Wait for the password input to be interactable
+        password_input = WebDriverWait(driver, 15).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
         )
         password_input.send_keys(zapier_password)
-        password_input.send_keys(Keys.RETURN)  # Keys.RETURN to press Enter
+        password_input.send_keys(Keys.RETURN)
 
         # Wait for the "Continue" button to become clickable
-        continue_button = WebDriverWait(driver, 10).until(
+        continue_button = WebDriverWait(driver, 15).until(
             EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Continue']]"))
         )
         continue_button.click()
@@ -134,7 +133,7 @@ def get_zapier_usage():
         driver.get("https://zapier.com/app/home")
 
         # Wait for the sidebar collapse button to be clickable, then click it
-        expand_sidebar_button = WebDriverWait(driver, 10).until(
+        expand_sidebar_button = WebDriverWait(driver, 15).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "button.css-1xymhdn-MenuCollapseButton"))
         )
         expand_sidebar_button.click()
@@ -143,13 +142,23 @@ def get_zapier_usage():
         time.sleep(5)
 
         # Scrape all text content from the InAppSidebarFooter__footerWrapper div
-        footer_content = WebDriverWait(driver, 10).until(
+        footer_content = WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div.css-1fmjwmw-InAppSidebarFooter__footerWrapper"))
         ).text
 
         return footer_content
     finally:
         driver.quit()
+
+def send_discord_message(content):
+    data = {
+        "content": content
+    }
+    response = requests.post(discord_webhook_url, json=data)
+    if response.status_code == 204:
+        print("Message sent successfully to Discord.")
+    else:
+        print(f"Failed to send message to Discord. Status code: {response.status_code}, Response: {response.text}")
 
 def main():
     discord_message = ""
