@@ -1,5 +1,5 @@
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from dotenv import load_dotenv
 from selenium import webdriver
@@ -70,13 +70,13 @@ def get_usage_indicator(usage_pct, period_pct):
         return '🔴'
 
 def calculate_monthly_period_percentage():
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     reset_day = 20
     reset_hour = 16  # 4:30 PM BST
 
     current_month = now.month
     current_year = now.year
-    reset_time = datetime(current_year, current_month, reset_day, reset_hour, 30)
+    reset_time = datetime(current_year, current_month, reset_day, reset_hour, 30, tzinfo=timezone.utc)
 
     if now < reset_time:
         last_reset_time = reset_time.replace(month=current_month - 1 if current_month > 1 else 12, year=current_year if current_month > 1 else current_year - 1)
@@ -88,17 +88,17 @@ def calculate_monthly_period_percentage():
     return period_pct
 
 def get_zapier_usage():
-    # Set up the Selenium WebDriver
+    # Set up the Selenium WebDriver (remove the headless option for testing)
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless")  # Enable headless mode for GitHub Actions
+    # options.add_argument("--headless")  # Comment out to see the browser during testing
     driver = webdriver.Chrome(options=options)
 
     try:
         # Navigate to Zapier login page
         driver.get("https://zapier.com/app/login")
 
-        # Click the "Sign in with Google" button
-        google_signin_button = WebDriverWait(driver, 15).until(
+        # Click the "Sign in with Google" button using refined selector
+        google_signin_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Continue with Google')]"))
         )
         google_signin_button.click()
@@ -107,21 +107,22 @@ def get_zapier_usage():
         time.sleep(10)
 
         # Send the email directly to the input field where the caret is already placed
-        email_input = WebDriverWait(driver, 15).until(
+        email_input = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email']"))
         )
         email_input.send_keys(zapier_email)
-        email_input.send_keys(Keys.RETURN)
+        email_input.send_keys(Keys.RETURN)  # Keys.RETURN to press Enter
 
-        # Wait for the password input to be interactable
-        password_input = WebDriverWait(driver, 15).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
+        # Wait for the password input to load and enter the password
+        time.sleep(5)
+        password_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
         )
-        password_input.send_keys(zapier_password)
-        password_input.send_keys(Keys.RETURN)
+        password_input.send_keys(zapier_password)  # Replace with the actual password
+        password_input.send_keys(Keys.RETURN)  # Keys.RETURN to press Enter
 
         # Wait for the "Continue" button to become clickable
-        continue_button = WebDriverWait(driver, 15).until(
+        continue_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Continue']]"))
         )
         continue_button.click()
@@ -132,8 +133,11 @@ def get_zapier_usage():
         # Navigate to the Zapier home page where the usage information is displayed
         driver.get("https://zapier.com/app/home")
 
+        # Wait for the page to load
+        time.sleep(5)
+
         # Wait for the sidebar collapse button to be clickable, then click it
-        expand_sidebar_button = WebDriverWait(driver, 15).until(
+        expand_sidebar_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "button.css-1xymhdn-MenuCollapseButton"))
         )
         expand_sidebar_button.click()
@@ -142,10 +146,11 @@ def get_zapier_usage():
         time.sleep(5)
 
         # Scrape all text content from the InAppSidebarFooter__footerWrapper div
-        footer_content = WebDriverWait(driver, 15).until(
+        footer_content = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div.css-1fmjwmw-InAppSidebarFooter__footerWrapper"))
         ).text
 
+        # Return the full text content
         return footer_content
     finally:
         driver.quit()
