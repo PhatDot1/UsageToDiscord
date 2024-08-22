@@ -2,6 +2,12 @@ import requests
 from datetime import datetime
 import os
 from dotenv import load_dotenv
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
 
 # Load environment variables from .env file
 load_dotenv()
@@ -15,6 +21,10 @@ organization_id = os.getenv('MAKE_ORG_ID')
 
 # Discord Webhook URL
 discord_webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
+
+# Zapier credentials
+zapier_email = os.getenv('ZAPIER_EMAIL')
+zapier_password = os.getenv('ZAPIER_PASSWORD')
 
 def get_phantombuster_usage(api_key):
     url = "https://api.phantombuster.com/api/v2/orgs/fetch-resources"
@@ -45,14 +55,6 @@ def get_make_usage(api_key, organization_id):
 def calculate_percentage(part, total):
     return (part / total) * 100 if total > 0 else 0
 
-def calculate_time_percentage(start_time, end_time):
-    now = datetime.utcnow()
-    start_time = datetime.utcfromtimestamp(start_time / 1000)
-    end_time = datetime.utcfromtimestamp(end_time / 1000)
-    total_duration = (end_time - start_time).total_seconds()
-    elapsed_duration = (now - start_time).total_seconds()
-    return (elapsed_duration / total_duration) * 100 if total_duration > 0 else 0
-
 def visualize_loading_bar(percentage):
     bar_length = 20
     filled_length = int(round(bar_length * percentage / 100))
@@ -67,50 +69,115 @@ def get_usage_indicator(usage_pct, period_pct):
     else:
         return '🔴'
 
-def send_discord_message(content):
-    data = {
-        "content": content
-    }
-    response = requests.post(discord_webhook_url, json=data)
-    if response.status_code == 204:
-        print("Message sent successfully to Discord.")
+def calculate_monthly_period_percentage():
+    now = datetime.utcnow()
+    reset_day = 20
+    reset_hour = 16  # 4:30 PM BST
+
+    current_month = now.month
+    current_year = now.year
+    reset_time = datetime(current_year, current_month, reset_day, reset_hour, 30)
+
+    if now < reset_time:
+        last_reset_time = reset_time.replace(month=current_month - 1 if current_month > 1 else 12, year=current_year if current_month > 1 else current_year - 1)
     else:
-        print(f"Failed to send message to Discord. Status code: {response.status_code}, Response: {response.text}")
+        last_reset_time = reset_time
+        reset_time = reset_time.replace(month=current_month + 1 if current_month < 12 else 1, year=current_year if current_month < 12 else current_year + 1)
+
+    period_pct = (now - last_reset_time).total_seconds() / (reset_time - last_reset_time).total_seconds() * 100
+    return period_pct
+
+def get_zapier_usage():
+    # Set up the Selenium WebDriver (remove the headless option for testing)
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless")  # Enable headless mode for GitHub Actions
+    driver = webdriver.Chrome(options=options)
+
+    try:
+        # Navigate to Zapier login page
+        driver.get("https://zapier.com/app/login")
+
+        # Click the "Sign in with Google" button using refined selector
+        google_signin_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Continue with Google')]"))
+        )
+        google_signin_button.click()
+
+        # Wait for the Google login page to load
+        time.sleep(10)
+
+        # Send the email directly to the input field where the caret is already placed
+        email_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email']"))
+        )
+        email_input.send_keys(zapier_email)
+        email_input.send_keys(Keys.RETURN)  # Keys.RETURN to press Enter
+
+        # Wait for the password input to load and enter the password
+        time.sleep(5)
+        password_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
+        )
+        password_input.send_keys(zapier_password)
+        password_input.send_keys(Keys.RETURN)  # Keys.RETURN to press Enter
+
+        # Wait for the "Continue" button to become clickable
+        continue_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Continue']]"))
+        )
+        continue_button.click()
+
+        # Wait for the login to complete
+        time.sleep(10)
+
+        # Navigate to the Zapier home page where the usage information is displayed
+        driver.get("https://zapier.com/app/home")
+
+        # Wait for the sidebar collapse button to be clickable, then click it
+        expand_sidebar_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "button.css-1xymhdn-MenuCollapseButton"))
+        )
+        expand_sidebar_button.click()
+
+        # Wait for the sidebar to expand and the content to be available
+        time.sleep(5)
+
+        # Scrape all text content from the InAppSidebarFooter__footerWrapper div
+        footer_content = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.css-1fmjwmw-InAppSidebarFooter__footerWrapper"))
+        ).text
+
+        return footer_content
+    finally:
+        driver.quit()
 
 def main():
+    discord_message = ""
+
+    # Calculate the period percentage for monthly reset
+    period_pct = calculate_monthly_period_percentage()
+
     # Fetch PhantomBuster usage
     phantombuster_usage = get_phantombuster_usage(phantombuster_api_key)
-    
-    # Prepare the message content
-    discord_message = ""
 
     # Calculate PhantomBuster usage percentages
     if isinstance(phantombuster_usage, dict):
-        daily_exec_time_pct = calculate_percentage(phantombuster_usage['dailyExecutionTime'], phantombuster_usage['plan']['dailyExecutionTime'])
         monthly_exec_time_pct = calculate_percentage(phantombuster_usage['monthlyExecutionTime'], phantombuster_usage['plan']['monthlyExecutionTime'])
-        daily_reset_pct = calculate_time_percentage(phantombuster_usage['dailyResourceNextResetAt'] - 24*3600*1000, phantombuster_usage['dailyResourceNextResetAt'])
-        monthly_reset_pct = calculate_time_percentage(phantombuster_usage['monthlyResourceNextResetAt'] - 30*24*3600*1000, phantombuster_usage['monthlyResourceNextResetAt'])
 
         discord_message += "# === PhantomBuster Usage Information ===\n"
-        discord_message += f"**Daily Execution Time Used:** {visualize_loading_bar(daily_exec_time_pct)} {get_usage_indicator(daily_exec_time_pct, daily_reset_pct)}\n"
-        discord_message += f"**Percent Through Daily Period:** {visualize_loading_bar(daily_reset_pct)}\n\n"
-        discord_message += f"**Monthly Execution Time Used:** {visualize_loading_bar(monthly_exec_time_pct)} {get_usage_indicator(monthly_exec_time_pct, monthly_reset_pct)}\n"
-        discord_message += f"**Percent Through Monthly Period:** {visualize_loading_bar(monthly_reset_pct)}\n"
+        discord_message += f"**Monthly Execution Time Used:** {visualize_loading_bar(monthly_exec_time_pct)} {get_usage_indicator(monthly_exec_time_pct, period_pct)}\n"
+        discord_message += f"**Percent Through Monthly Period:** {visualize_loading_bar(period_pct)}\n\n"
     else:
         discord_message += str(phantombuster_usage)
 
     # Fetch Make usage
     make_usage = get_make_usage(make_api_key, organization_id)
-    
+
     # Calculate Make usage percentages
     if isinstance(make_usage, dict):
         make_org = make_usage['organization']
         operations_used_pct = calculate_percentage(int(make_org['operations']), make_org['license']['operations'])
         transfer_used_pct = calculate_percentage(int(make_org['transfer']), make_org['license']['transfer'])
-        
-        last_reset = datetime.strptime(make_org['lastReset'], '%Y-%m-%dT%H:%M:%S.%fZ')
-        next_reset = datetime.strptime(make_org['nextReset'], '%Y-%m-%dT%H:%M:%S.%fZ')
-        period_pct = calculate_percentage((datetime.utcnow() - last_reset).total_seconds(), (next_reset - last_reset).total_seconds())
 
         discord_message += "\n# === Make (Formerly Integromat) Usage Information ===\n"
         discord_message += f"**Operations Used:** {visualize_loading_bar(operations_used_pct)} {get_usage_indicator(operations_used_pct, period_pct)}\n"
@@ -118,6 +185,21 @@ def main():
         discord_message += f"**Percent Through Current Usage Period:** {visualize_loading_bar(period_pct)}\n"
     else:
         discord_message += str(make_usage)
+
+    # Fetch Zapier usage
+    zapier_usage = get_zapier_usage()
+
+    # Parse and calculate Zapier usage
+    if zapier_usage:
+        tasks_used_line = [line for line in zapier_usage.splitlines() if "Included Tasks" in line][0]
+        tasks_used, task_limit = map(int, tasks_used_line.split()[1].split('/'))
+        zapier_usage_pct = calculate_percentage(tasks_used, task_limit)
+
+        discord_message += "\n# === Zapier Usage Information ===\n"
+        discord_message += f"**Included Tasks Used:** {visualize_loading_bar(zapier_usage_pct)} {get_usage_indicator(zapier_usage_pct, period_pct)}\n"
+        discord_message += f"**Percent Through Monthly Period:** {visualize_loading_bar(period_pct)}\n"
+    else:
+        discord_message += "Failed to retrieve Zapier usage."
 
     # Send the message to Discord
     send_discord_message(discord_message)
