@@ -88,9 +88,12 @@ def calculate_monthly_period_percentage():
     return period_pct
 
 def get_zapier_usage():
-    # Set up the Selenium WebDriver (remove the headless option for testing)
+    # Set up the Selenium WebDriver with additional options
     options = webdriver.ChromeOptions()
+    options.add_argument("--no-sandbox")  # Bypass OS security model, useful in CI environments
+    options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
     # options.add_argument("--headless")  # Comment out to see the browser during testing
+
     driver = webdriver.Chrome(options=options)
 
     try:
@@ -110,7 +113,7 @@ def get_zapier_usage():
         email_input = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email']"))
         )
-        email_input.send_keys(zapier_email)
+        email_input.send_keys(os.getenv('ZAPIER_EMAIL'))
         email_input.send_keys(Keys.RETURN)  # Keys.RETURN to press Enter
 
         # Wait for the password input to load and enter the password
@@ -118,7 +121,7 @@ def get_zapier_usage():
         password_input = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
         )
-        password_input.send_keys(zapier_password)  # Replace with the actual password
+        password_input.send_keys(os.getenv('ZAPIER_PASSWORD'))
         password_input.send_keys(Keys.RETURN)  # Keys.RETURN to press Enter
 
         # Wait for the "Continue" button to become clickable
@@ -154,6 +157,7 @@ def get_zapier_usage():
         return footer_content
     finally:
         driver.quit()
+
 
 def send_discord_message(content):
     data = {
