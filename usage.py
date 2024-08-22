@@ -88,75 +88,62 @@ def calculate_monthly_period_percentage():
     return period_pct
 
 def get_zapier_usage():
-    # Set up the Selenium WebDriver with additional options
     options = webdriver.ChromeOptions()
-    options.add_argument("--no-sandbox")  # Bypass OS security model, useful in CI environments
-    options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
-    # options.add_argument("--headless")  # Comment out to see the browser during testing
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--remote-debugging-port=9222")  # Sometimes needed in CI
+    # Do not add headless mode since we want to run with a display
 
     driver = webdriver.Chrome(options=options)
 
     try:
-        # Navigate to Zapier login page
         driver.get("https://zapier.com/app/login")
 
-        # Click the "Sign in with Google" button using refined selector
         google_signin_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Continue with Google')]"))
         )
         google_signin_button.click()
 
-        # Wait for the Google login page to load
         time.sleep(10)
 
-        # Send the email directly to the input field where the caret is already placed
         email_input = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email']"))
         )
         email_input.send_keys(os.getenv('ZAPIER_EMAIL'))
-        email_input.send_keys(Keys.RETURN)  # Keys.RETURN to press Enter
+        email_input.send_keys(Keys.RETURN)
 
-        # Wait for the password input to load and enter the password
         time.sleep(5)
         password_input = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
         )
         password_input.send_keys(os.getenv('ZAPIER_PASSWORD'))
-        password_input.send_keys(Keys.RETURN)  # Keys.RETURN to press Enter
+        password_input.send_keys(Keys.RETURN)
 
-        # Wait for the "Continue" button to become clickable
         continue_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Continue']]"))
         )
         continue_button.click()
 
-        # Wait for the login to complete
         time.sleep(10)
 
-        # Navigate to the Zapier home page where the usage information is displayed
         driver.get("https://zapier.com/app/home")
-
-        # Wait for the page to load
         time.sleep(5)
 
-        # Wait for the sidebar collapse button to be clickable, then click it
         expand_sidebar_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "button.css-1xymhdn-MenuCollapseButton"))
         )
         expand_sidebar_button.click()
 
-        # Wait for the sidebar to expand and the content to be available
         time.sleep(5)
 
-        # Scrape all text content from the InAppSidebarFooter__footerWrapper div
         footer_content = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div.css-1fmjwmw-InAppSidebarFooter__footerWrapper"))
         ).text
 
-        # Return the full text content
         return footer_content
     finally:
         driver.quit()
+
 
 
 def send_discord_message(content):
