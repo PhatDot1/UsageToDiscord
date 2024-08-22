@@ -31,4 +31,4 @@ jobs:
         MAKE_ORG_ID: ${{ secrets.MAKE_ORG_ID }}
         DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
       run: |
-        python usage.py
+        python working.py
