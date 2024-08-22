@@ -95,8 +95,10 @@ def get_zapier_usage():
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--remote-debugging-port=9222")  # Sometimes needed in CI
-    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+    options.add_argument("--remote-debugging-port=9222")
+
+    # Initialize Chrome WebDriver with the correct executable path and options
+    driver = webdriver.Chrome(executable_path=ChromeDriverManager().install(), options=options)
 
     try:
         driver.get("https://zapier.com/app/login")
