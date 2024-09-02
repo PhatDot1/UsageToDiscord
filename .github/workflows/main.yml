@@ -2,7 +2,7 @@ name: Usage Report
 
 on:
   schedule:
-    - cron: "59 6 * * *" 
+    - cron: "59 6 * * 1" 
 
   workflow_dispatch:  # Allows manual triggering
 
